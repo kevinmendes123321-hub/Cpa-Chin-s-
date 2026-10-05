@@ -1,0 +1,1 @@
+window.DADOS_2026_10_03={data:'2026-10-03',lucro:400,observacao:'Lucro líquido informado para sábado. Depósitos e saques detalhados ainda não informados.'};
