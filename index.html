@@ -11,4 +11,19 @@
  input.onchange=async()=>{try{const file=input.files&&input.files[0];if(!file)return;if(file.size>20*1024*1024)throw Error('Arquivo muito grande.');const data=JSON.parse(await file.text());if(data.format!=='cpa-backup-v1'||!data.storage||typeof data.storage!=='object'||Array.isArray(data.storage))throw Error('Arquivo de backup incompatível.');const incoming=data.storage;for(const k of keys){if(k in incoming&&typeof incoming[k]!=='string')throw Error('Formato inválido: '+k)}for(const k of ['controle_mov_v3','controle_lotes_v1','controle_emprestimos_v1']){if(k in incoming&&!Array.isArray(JSON.parse(incoming[k])))throw Error('Dados inválidos: '+k)}if(!keys.some(k=>k in incoming))throw Error('Nenhum dado CPA encontrado.');if(!confirm('ATENÇÃO: importar substitui os dados deste navegador pelos do arquivo. Uma cópia dos dados atuais será baixada primeiro. Continuar?'))return;backup();for(const k of keys){if(k in incoming)localStorage.setItem(k,incoming[k])}alert('Importação concluída. A página será atualizada.');location.reload()}catch(err){alert('Não foi possível importar: '+err.message)}finally{input.value=''}};
  const main=document.querySelector('main.wrap');if(main)main.insertBefore(panel,main.firstChild);
 })();
-</script><script src="sync-supabase.js"></script></body></html>
+</script><script src="sync-supabase.js"></script><script>
+(function(){
+ function tidy(){
+  const main=document.querySelector('main.wrap');if(!main)return;
+  const backup=[...main.children].find(el=>el.querySelector&&[...el.querySelectorAll('button')].some(b=>b.textContent.includes('Baixar backup')));
+  const cloud=document.getElementById('cpa-cloud-status')?.closest('section');
+  if(!backup&&!cloud)return;
+  const details=document.createElement('details');details.style.cssText='margin:12px auto;max-width:760px;background:#123b30;color:#fff;border-radius:12px;padding:12px 14px;font:14px system-ui';
+  const summary=document.createElement('summary');summary.textContent='⚙ Dados e sincronização (backup, conta e celular)';summary.style.cssText='cursor:pointer;font-weight:700;padding:4px 0';details.appendChild(summary);
+  if(cloud){cloud.style.margin='12px 0';details.appendChild(cloud)}
+  if(backup){backup.style.margin='12px 0 0';backup.style.maxWidth='none';details.appendChild(backup)}
+  main.insertBefore(details,main.firstChild);
+ }
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(tidy,0));else setTimeout(tidy,0);
+})();
+</script></body></html>
