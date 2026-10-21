@@ -11,19 +11,53 @@
  input.onchange=async()=>{try{const file=input.files&&input.files[0];if(!file)return;if(file.size>20*1024*1024)throw Error('Arquivo muito grande.');const data=JSON.parse(await file.text());if(data.format!=='cpa-backup-v1'||!data.storage||typeof data.storage!=='object'||Array.isArray(data.storage))throw Error('Arquivo de backup incompatível.');const incoming=data.storage;for(const k of keys){if(k in incoming&&typeof incoming[k]!=='string')throw Error('Formato inválido: '+k)}for(const k of ['controle_mov_v3','controle_lotes_v1','controle_emprestimos_v1']){if(k in incoming&&!Array.isArray(JSON.parse(incoming[k])))throw Error('Dados inválidos: '+k)}if(!keys.some(k=>k in incoming))throw Error('Nenhum dado CPA encontrado.');if(!confirm('ATENÇÃO: importar substitui os dados deste navegador pelos do arquivo. Uma cópia dos dados atuais será baixada primeiro. Continuar?'))return;backup();for(const k of keys){if(k in incoming)localStorage.setItem(k,incoming[k])}alert('Importação concluída. A página será atualizada.');location.reload()}catch(err){alert('Não foi possível importar: '+err.message)}finally{input.value=''}};
  const main=document.querySelector('main.wrap');if(main)main.insertBefore(panel,main.firstChild);
 })();
-</script><script src="sync-supabase.js"></script><script>
+</script><script src="sync-supabase.js"></script><style>
+#cpa-account-open{position:absolute;right:20px;top:35px;background:#15956e;color:white;border:0;border-radius:11px;padding:10px 15px;font-weight:700;cursor:pointer;z-index:3}
+#cpa-account-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.76);z-index:9999;align-items:center;justify-content:center;padding:16px;overflow:auto}
+#cpa-account-modal.open{display:flex}
+#cpa-account-box{width:min(100%,540px);max-height:90vh;overflow:auto;background:#0d2524;color:#fff;border:1px solid #31594c;border-radius:18px;padding:20px;font:14px system-ui}
+#cpa-account-box h2{margin:0 0 8px}
+#cpa-account-close{float:right;background:transparent;color:white;border:0;font-size:25px;cursor:pointer}
+#cpa-account-box #cpa-cloud-status{line-height:1.5}
+#cpa-account-box section{margin:12px 0!important;padding:0!important;border:0!important;background:transparent!important}
+#cpa-account-box details{margin-top:15px;padding:12px;border:1px solid #36564d;border-radius:10px}
+#cpa-account-box summary{cursor:pointer;font-weight:700}
+#cpa-account-box input{color:white;background:#102b32;border-color:#36564d}
+#cpa-account-box #cpa-cloud-buttons{gap:7px}
+#cpa-account-box #cpa-cloud-buttons button{flex:1}
+</style>
+<script>
 (function(){
- function tidy(){
-  const main=document.querySelector('main.wrap');if(!main)return;
-  const backup=[...main.children].find(el=>el.querySelector&&[...el.querySelectorAll('button')].some(b=>b.textContent.includes('Baixar backup')));
-  const cloud=document.getElementById('cpa-cloud-status')?.closest('section');
-  if(!backup&&!cloud)return;
-  const details=document.createElement('details');details.style.cssText='margin:12px auto;max-width:760px;background:#123b30;color:#fff;border-radius:12px;padding:12px 14px;font:14px system-ui';
-  const summary=document.createElement('summary');summary.textContent='⚙ Dados e sincronização (backup, conta e celular)';summary.style.cssText='cursor:pointer;font-weight:700;padding:4px 0';details.appendChild(summary);
-  if(cloud){cloud.style.margin='12px 0';details.appendChild(cloud)}
-  if(backup){backup.style.margin='12px 0 0';backup.style.maxWidth='none';details.appendChild(backup)}
-  main.insertBefore(details,main.firstChild);
+ function init(){
+  const header=document.querySelector('header.top'),main=document.querySelector('main.wrap');if(!header||!main)return;
+  header.style.position='relative';
+  const open=document.createElement('button');open.id='cpa-account-open';open.type='button';open.textContent='👤 Minha conta';header.appendChild(open);
+  const overlay=document.createElement('div');overlay.id='cpa-account-modal';
+  overlay.innerHTML='<div id="cpa-account-box" role="dialog" aria-modal="true" aria-label="Minha conta"><button id="cpa-account-close" aria-label="Fechar" type="button">×</button><h2>Minha conta</h2><p>Entre para sincronizar seus dados entre computador e celular.</p><div id="cpa-account-content"></div><details id="cpa-backup-settings"><summary>Backup e recuperação de dados</summary><div id="cpa-backup-content"></div></details><button type="button" id="cpa-account-logout" style="display:none;margin-top:14px;padding:10px 13px;background:#513c3c;color:#fff;border:0;border-radius:9px">Sair da conta</button></div>';
+  document.body.appendChild(overlay);
+  const close=()=>overlay.classList.remove('open');
+  open.onclick=()=>{syncPanels();overlay.classList.add('open')};
+  document.getElementById('cpa-account-close').onclick=close;
+  overlay.addEventListener('click',e=>{if(e.target===overlay)close()});
+  document.getElementById('cpa-account-logout').onclick=()=>{if(!confirm('Sair desta conta neste aparelho? A sincronização será interrompida até entrar novamente.'))return;localStorage.removeItem('cpa_auth_v1');location.reload()};
+  function syncPanels(){
+   const cloud=document.getElementById('cpa-cloud-status')?.closest('section');
+   const backup=[...main.querySelectorAll('div')].find(el=>el.querySelector&&el.querySelector('button')?.textContent?.includes('Baixar backup')&&el.querySelectorAll('button').length===2);
+   if(cloud&&cloud.parentElement?.id!=='cpa-account-content')document.getElementById('cpa-account-content').appendChild(cloud);
+   if(backup&&backup.parentElement?.id!=='cpa-backup-content')document.getElementById('cpa-backup-content').appendChild(backup);
+   const signed=!!localStorage.getItem('cpa_auth_v1');
+   const logout=document.getElementById('cpa-account-logout');logout.style.display=signed?'block':'none';
+   if(signed&&cloud){
+    const email=document.getElementById('cpa-cloud-email'),pass=document.getElementById('cpa-cloud-pass');
+    if(email&&pass){email.parentElement.style.display='none';}
+    const login=document.getElementById('cpa-cloud-login'),signup=document.getElementById('cpa-cloud-signup');
+    if(login)login.style.display='none';if(signup)signup.style.display='none';
+    open.textContent='☁ Minha conta';
+   }
+  }
+  syncPanels();const observer=new MutationObserver(()=>syncPanels());observer.observe(main,{childList:true,subtree:false});
+  setTimeout(syncPanels,300);setTimeout(syncPanels,1500);
  }
- if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(tidy,0));else setTimeout(tidy,0);
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
 })();
 </script></body></html>
