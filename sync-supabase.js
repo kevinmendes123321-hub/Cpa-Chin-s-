@@ -2,7 +2,7 @@
 const keys=['controle_mov_v3','controle_lotes_v1','controle_emprestimos_v1','cpa_banca_inicial_v1','cpa_nova_banca_periodo_v1','cpa_reset_20261015_v1','emprestimos_150_v1'];
 const snapshot=()=>Object.fromEntries(keys.filter(k=>localStorage.getItem(k)!==null).map(k=>[k,localStorage.getItem(k)]));
 async function request(path,method='GET',body){const h={apikey:KEY,'Content-Type':'application/json'};if(auth?.access_token)h.Authorization='Bearer '+auth.access_token;const r=await fetch(URL_BASE+path,{method,headers:h,body:body?JSON.stringify(body):undefined});const d=await r.json();if(!r.ok)throw Error(d.message||d.msg||d.error_description||'Falha na conexão');return d}
-function status(t){document.getElementById('cpa-cloud-status').textContent=t}
+function status(t){const el=document.getElementById('cpa-cloud-status');if(el)el.textContent=t;const controls=document.getElementById('cpa-cloud-buttons');if(controls){const isActive=active&&t.includes('Sincroniza');const up=document.getElementById('cpa-cloud-upload'),down=document.getElementById('cpa-cloud-download');if(up)up.style.display=isActive?'none':'';if(down)down.style.display=isActive?'none':''}}
 function saveAuth(d){auth=d;localStorage.setItem(SK,JSON.stringify(d))}
 async function login(){try{const email=document.getElementById('cpa-cloud-email').value.trim(),password=document.getElementById('cpa-cloud-pass').value;saveAuth(await request('/auth/v1/token?grant_type=password','POST',{email,password}));status('Conectado. Preparando sincronização...');await startAuto()}catch(e){status('Erro: '+e.message)}}
 async function signup(){try{const email=document.getElementById('cpa-cloud-email').value.trim(),password=document.getElementById('cpa-cloud-pass').value;await request('/auth/v1/signup','POST',{email,password});status('Cadastro solicitado. Confirme seu e-mail e depois clique em Entrar.')}catch(e){status('Erro: '+e.message)}}
@@ -21,7 +21,7 @@ if(!force&&current!==incoming){
  for(const [k,v] of Object.entries(remote.payload||{}))if(keys.includes(k)&&typeof v==='string')localStorage.setItem(k,v);
  sessionStorage.setItem('cpa_cloud_autostart','1');location.reload();return;
 }
-lastLocal=current;lastRemote=remote.updated_at;active=true;status('Sincronização automática ativa.');syncTimer=setInterval(syncOnce,7000);
+lastLocal=current;lastRemote=remote.updated_at;active=true;status('Sincronização automática ativa. Os dados são atualizados sem usar botões.');syncTimer=setInterval(syncOnce,7000);
 }
 async function syncOnce(){if(!active||syncing||document.hidden||!navigator.onLine)return;syncing=true;try{
  const local=snapshot(),current=digest(local),remote=await remoteState();if(!remote){active=false;status('Registro da nuvem não encontrado. Sincronização pausada.');return}
