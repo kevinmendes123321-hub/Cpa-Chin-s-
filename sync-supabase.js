@@ -1,7 +1,7 @@
 (()=>{const URL_BASE='https://koiylzodwhjlophivove.supabase.co',KEY='sb_publishable_g_uZLvcdAe6tOvWmaW_rVw_UD69FgBK',SK='cpa_auth_v1';let auth=null, syncTimer=null, lastLocal=null, lastRemote=null, syncing=false, active=false;
 const keys=['controle_mov_v3','controle_lotes_v1','controle_emprestimos_v1','cpa_banca_inicial_v1','cpa_nova_banca_periodo_v1','cpa_reset_20261015_v1','emprestimos_150_v1'];
 const snapshot=()=>Object.fromEntries(keys.filter(k=>localStorage.getItem(k)!==null).map(k=>[k,localStorage.getItem(k)]));
-async function request(path,method='GET',body){const h={apikey:KEY,'Content-Type':'application/json'};if(auth?.access_token)h.Authorization='Bearer '+auth.access_token;const r=await fetch(URL_BASE+path,{method,headers:h,body:body?JSON.stringify(body):undefined});const d=await r.json();if(!r.ok)throw Error(d.message||d.msg||d.error_description||'Falha na conexão');return d}
+async function request(path,method='GET',body){const h={apikey:KEY,'Content-Type':'application/json'};if(method==='POST'&&path.includes('/rest/v1/cpa_sync'))h.Prefer='resolution=merge-duplicates,return=representation';if(auth?.access_token)h.Authorization='Bearer '+auth.access_token;const r=await fetch(URL_BASE+path,{method,headers:h,body:body?JSON.stringify(body):undefined});const d=await r.json();if(!r.ok)throw Error(d.message||d.msg||d.error_description||'Falha na conexão');return d}
 function status(t){const el=document.getElementById('cpa-cloud-status');if(el)el.textContent=t;const controls=document.getElementById('cpa-cloud-buttons');if(controls){const isActive=active&&t.includes('Sincroniza');const up=document.getElementById('cpa-cloud-upload'),down=document.getElementById('cpa-cloud-download');if(up)up.style.display=isActive?'none':'';if(down)down.style.display=isActive?'none':''}}
 function saveAuth(d){auth=d;localStorage.setItem(SK,JSON.stringify(d))}
 async function login(){try{const email=document.getElementById('cpa-cloud-email').value.trim(),password=document.getElementById('cpa-cloud-pass').value;saveAuth(await request('/auth/v1/token?grant_type=password','POST',{email,password}));status('Conectado. Preparando sincronização...');await startAuto()}catch(e){status('Erro: '+e.message)}}
@@ -16,12 +16,12 @@ async function startAuto(force=false){if(syncTimer)clearInterval(syncTimer);acti
 const local=snapshot(),current=digest(local),incoming=digest(remote.payload||{});
 if(!force&&current!==incoming){
  const isEmpty=!local.controle_mov_v3||local.controle_mov_v3==='[]';
- if(!isEmpty){status('Os dados deste aparelho diferem da nuvem. Faça backup e escolha Enviar ou Receber antes de ativar a sincronização.');return}
+ if(!isEmpty){status('⚠ Dados diferentes neste aparelho. No PC com valores corretos: Enviar dados. No celular: Receber dados. Faça backup antes.');return}
  if(!confirm('Há dados na nuvem. Carregar neste aparelho e iniciar a sincronização automática?'))return;
  for(const [k,v] of Object.entries(remote.payload||{}))if(keys.includes(k)&&typeof v==='string')localStorage.setItem(k,v);
  sessionStorage.setItem('cpa_cloud_autostart','1');location.reload();return;
 }
-lastLocal=current;lastRemote=remote.updated_at;active=true;status('Sincronização automática ativa. Os dados são atualizados sem usar botões.');syncTimer=setInterval(syncOnce,7000);
+lastLocal=current;lastRemote=remote.updated_at;active=true;status('Sincronização automática ativa. Os dados são atualizados sem usar botões.');syncTimer=setInterval(syncOnce,7000);window.addEventListener('focus',syncOnce);document.addEventListener('visibilitychange',()=>{if(!document.hidden)syncOnce()});
 }
 async function syncOnce(){if(!active||syncing||document.hidden||!navigator.onLine)return;syncing=true;try{
  const local=snapshot(),current=digest(local),remote=await remoteState();if(!remote){active=false;status('Registro da nuvem não encontrado. Sincronização pausada.');return}
